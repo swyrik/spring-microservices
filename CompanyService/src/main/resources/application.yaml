@@ -1,0 +1,11 @@
+server:
+  port: 7091
+  
+spring:
+  application:
+    name: COMPANY-SERVICE
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/auth/realms/dev

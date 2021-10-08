@@ -1,0 +1,127 @@
+server:
+  port: 6001
+spring:
+  main:    web-application-type: reactive  application:    name: gateway
+  security:
+    oauth2:                                                           
+      client:
+        registration:
+          employee-service: 
+            provider: keycloak                                  
+            client-id: employee-service
+            client-secret: f704e4de-9273-489b-8017-a8ade3788a97
+            redirect-uri: '{baseUrl}/login/oauth2/code/{registrationId}'
+            authorization-grant-type: authorization_code
+            scope:
+            - openid
+            - email
+            - profile
+            - roles
+            - DASH
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:8080/auth/realms/dev
+            jwk-set-uri: http://localhost:8080/auth/realms/dev/protocol/openid-connect/certs
+            token-uri: http://localhost:8080/auth/realms/dev/protocol/openid-connect/token
+            user-info-uri: http://localhost:8080/auth/realms/dev/protocol/openid-connect/userinfo
+            user-name-attribute: sub
+            authorization-uri: http://localhost:8080/auth/realms/dev/protocol/openid-connect/auth
+      resourceserver: 
+        jwt:
+          issuer-uri: http://localhost:8080/auth/realms/dev
+          jwk-set-uri: http://localhost:8080/auth/realms/dev/protocol/openid-connect/certs
+          jws-algorithm: HS256
+ 
+  cloud:
+    gateway:
+      default-filters:
+        - TokenRelay
+      routes:
+      - id: productservice
+        uri: lb://EMPLOYEE-SERVICE
+        predicates:
+        - Path=/emp/**
+        filters:
+        - name: TokenRelay
+        - RemoveRequestHeader=Cookie
+        - name: Retry
+          args: 
+            retries: 3
+            statuses: BAD_REQUEST
+            methods: GET,POST
+            backoff:
+              firstBackoff: 1000ms
+              maxBackoff: 5000ms
+              factor: 2
+              basedOnPreviousValue: false
+        - name: CircuitBreaker
+          args:
+            name: getEmployees
+            fallbackUri: forward:/fallback
+      - id: companyservice
+        uri: lb://COMPANY-SERVICE
+        predicates:
+        - Path=/cmp/**
+        filters:
+        - name: TokenRelay
+        - RemoveRequestHeader=Cookie
+        - name: Retry
+          args: 
+            retries: 3
+            statuses: BAD_REQUEST
+            methods: GET,POST
+            backoff:
+              firstBackoff: 1000ms
+              maxBackoff: 5000ms
+              factor: 2
+              basedOnPreviousValue: false
+        - name: CircuitBreaker
+          args:
+            name: getCompany
+            fallbackUri: forward:/fallback
+
+#resilience4j.circuitbreaker:
+#  configs:
+#    default:
+#      registerHealthIndicator: true
+#      slidingWindowSize: 10
+#      minimumNumberOfCalls: 5
+#      slidingWindowType: TIME_BASED
+#      permittedNumberOfCallsInHalfOpenState: 3
+#      automaticTransitionFromOpenToHalfOpenEnabled: true
+#      waitDurationInOpenState: 2s
+#      failureRateThreshold: 30
+#      eventConsumerBufferSize: 10
+#      recordExceptions:
+#        - org.springframework.web.client.HttpServerErrorException
+#        - java.io.IOException
+#resilience4j.retry:
+#  configs:
+#    default:
+#      maxRetryAttempts: 2
+#      waitDuration: 1000
+#      retryExceptions:
+#        - org.springframework.web.client.HttpServerErrorException
+#        - java.io.IOException
+#        - java.lang.NullPointerException
+#
+#resilience4j.bulkhead:
+#  configs:
+#    default:
+#      maxConcurrentCalls: 100
+#
+#resilience4j.thread-pool-bulkhead:
+#  configs:
+#    default:
+#      maxThreadPoolSize: 4
+#      coreThreadPoolSize: 2
+#      queueCapacity: 2
+#
+#resilience4j.ratelimiter:
+#  configs:
+#    default:
+#      registerHealthIndicator: false
+#      limitForPeriod: 10
+#      limitRefreshPeriod: 1s
+#      timeoutDuration: 0
+#      eventConsumerBufferSize: 100
